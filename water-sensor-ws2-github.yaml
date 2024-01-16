@@ -1,0 +1,223 @@
+esphome:
+  name: screek-water-sensor-ws2
+  comment: Screek Water Sensor WS2
+  friendly_name: Water Sensor WS2
+  name_add_mac_suffix: True
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.f_cpu: 80000000L
+  on_boot:
+    - priority: 300
+      then:
+        lambda: |-
+          id(cpu_speed) = ESP.getCpuFreqMHz();
+  project: 
+    name: Screek_Workshop.Water_Sensor
+    version: WS2
+
+globals:
+   - id: cpu_speed
+     type: int
+     restore_value: no
+     initial_value: '0'
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/screekworkshop/custom_components_support_for_screek_1w
+      ref: main
+    components: [esp32, uart]
+  
+esp32:
+  board: lolin_c3_mini
+  framework:
+    type: arduino
+    version: 2.0.9
+    platform_version: 6.3.2
+
+improv_serial:
+  
+logger:
+  hardware_uart: uart0
+
+debug:
+  update_interval: 30s
+
+text_sensor:
+  - platform: debug
+    reset_reason:
+      name: "Reset Reason"
+      disabled_by_default: True
+  - platform: wifi_info
+    mac_address:
+      name: ESP MAC
+      entity_category: "diagnostic"
+      disabled_by_default: True
+    
+# Enable Home Assistant API
+api:
+  # encryption:
+    # key: "yourapipassword"
+
+ota:
+  password: "yourotapassword"
+  safe_mode: False
+
+wifi:
+  power_save_mode: LIGHT
+  reboot_timeout: 10min
+  ap:
+    ssid: "WATER-SENSOR WS2"
+
+captive_portal:
+
+web_server:
+  port: 80
+
+script:
+  - id: count_probe_nums
+    then:
+      - lambda: |-
+          int16_t counts = 0;
+          if (id(water_level_exists_1).state){
+            counts ++;
+          }
+          if (id(water_level_exists_2).state){
+            counts ++;
+          }
+          if (id(water_level_exists_3).state){
+            counts ++;
+          }
+          if (id(water_level_exists_4).state){
+            counts ++;
+          }
+          id(triggerd_probe_count).publish_state(counts);
+
+binary_sensor:
+  - platform: status
+    name: Online
+    id: ink_ha_connected
+
+  - platform: gpio
+    name: Water level 4 exists
+    id: water_level_exists_4
+    icon: mdi:water
+    on_state: 
+      then:
+        - script.execute: count_probe_nums
+    pin: 
+      number: GPIO4
+      # inverted: true
+      mode:
+        input: true
+        # pullup: true
+        pulldown: True
+    
+  - platform: gpio
+    name: Water level 1 exists
+    id: water_level_exists_1
+    icon: mdi:water
+    on_state: 
+      then:
+        - script.execute: count_probe_nums
+    pin: 
+      number: GPIO5
+      mode:
+        input: true
+        pulldown: True
+  - platform: gpio
+    name: Water level 2 exists
+    id: water_level_exists_2
+    icon: mdi:water
+    on_state: 
+      then:
+        - script.execute: count_probe_nums
+    pin: 
+      number: GPIO6
+      mode:
+        input: true
+        pulldown: True
+  - platform: gpio
+    name: Water level 3 exists
+    id: water_level_exists_3
+    icon: mdi:water
+    on_state: 
+      then:
+        - script.execute: count_probe_nums
+    pin: 
+      number: GPIO7
+      mode:
+        input: true
+        pulldown: True
+
+sensor:
+  - platform: template
+    name: Triggered Probe Count
+    id: triggerd_probe_count
+    icon: mdi:counter
+    accuracy_decimals: 0
+  - platform: template
+    name: "ESP CPU Speed"
+    accuracy_decimals: 0
+    unit_of_measurement: Mhz
+    lambda: |-
+      return (id(cpu_speed));
+    entity_category: "diagnostic"
+    update_interval: 600s
+  - platform: template
+    id: sys_esp_temperature
+    name: ESP Temperature
+    lambda: return temperatureRead();
+    unit_of_measurement: °C
+    device_class: TEMPERATURE
+    update_interval: 45s
+    entity_category: "diagnostic"
+  - platform: uptime
+    name: Uptime
+    id: sys_uptime
+    update_interval: 60s
+  - platform: wifi_signal 
+    name: RSSI
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+  - platform: template
+    id: esp_memory
+    icon: mdi:memory
+    name: ESP Free Memory
+    lambda: return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
+    unit_of_measurement: 'kB'
+    state_class: measurement
+    entity_category: "diagnostic"
+    update_interval: 60s
+
+# text_sensor:
+#   - platform: version
+#     name: "Version"
+#     id: hardware_compile_date
+#     # 隐藏时间戳？(23年2月24日_17时39分_)
+#     hide_timestamp: False
+#     entity_category: "diagnostic"
+
+light:
+  - platform: status_led
+    name: sys_status
+    id: sys_status
+    pin: 
+      number: GPIO8
+      inverted: True
+    internal: True
+    restore_mode: ALWAYS_OFF
+
+time:
+  - platform: sntp
+    id: time_now   
+
+button:
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "ESP Reboot"
+  - platform: factory_reset
+    disabled_by_default: True
+    name: Factory Reset
+    id: factory_reset_all
