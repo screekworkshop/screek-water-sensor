@@ -26,7 +26,7 @@ external_components:
       type: git
       url: https://github.com/screekworkshop/custom_components_support_for_screek_1w
       ref: main
-    components: [esp32, uart]
+    components: [uart]
   
 esp32:
   board: lolin_c3_mini
